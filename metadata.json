@@ -1,0 +1,6 @@
+{
+  "name": "ExpenseWise",
+  "description": "Smart Personal Expense Tracker with date-wise & category-wise reports, budget monitoring, analytics, and CSV export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
