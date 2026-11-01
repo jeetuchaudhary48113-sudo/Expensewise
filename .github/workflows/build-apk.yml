@@ -15,6 +15,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Setup persistent debug keystore
+  run: |
+    if [ ! -f "./debug.keystore" ]; then
+      if [ -f "./debug.keystore.base64" ]; then
+        echo "Restoring persistent debug.keystore from debug.keystore.base64..."
+        base64 -d ./debug.keystore.base64 > ./debug.keystore
+      ...
       - name: Checkout repository
         uses: actions/checkout@v4
 
