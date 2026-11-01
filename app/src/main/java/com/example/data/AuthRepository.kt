@@ -16,25 +16,45 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
+import com.example.ExpenseWiseApplication
+
 class AuthRepository(private val context: Context? = null) {
 
-    private fun getAuth(): FirebaseAuth {
-        if (context != null && FirebaseApp.getApps(context).isEmpty()) {
-            try {
-                FirebaseApp.initializeApp(context)
+    companion object {
+        private const val TAG = "AuthRepository"
+
+        /**
+         * Ensures that FirebaseApp is safely initialized and returns the initialized FirebaseApp instance.
+         */
+        @Synchronized
+        fun getOrInitFirebaseApp(context: Context?): FirebaseApp {
+            return try {
+                FirebaseApp.getInstance()
             } catch (e: Exception) {
-                Log.w("AuthRepository", "Default initializeApp failed, applying explicit FirebaseOptions: ${e.message}")
-                val options = com.google.firebase.FirebaseOptions.Builder()
-                    .setApplicationId("1:228650630825:android:13602ae0858abc1284b3b8")
-                    .setApiKey("AIzaSyD5CZDqwRaz1n-bUFlksWqEqvhX7GFxRXM")
-                    .setProjectId("expensewise-de113")
-                    .setGcmSenderId("228650630825")
-                    .setStorageBucket("expensewise-de113.firebasestorage.app")
-                    .build()
-                FirebaseApp.initializeApp(context, options)
+                Log.w(TAG, "Default FirebaseApp not initialized: ${e.message}. Initializing now...")
+                val ctx = context?.applicationContext
+                    ?: try { ExpenseWiseApplication.instance } catch (_: Throwable) { null }
+
+                if (ctx != null) {
+                    val app = try {
+                        FirebaseApp.initializeApp(ctx)
+                    } catch (t: Throwable) {
+                        null
+                    }
+                    if (app != null) {
+                        return app
+                    }
+                    FirebaseApp.initializeApp(ctx, ExpenseWiseApplication.defaultFirebaseOptions)
+                } else {
+                    throw IllegalStateException("Cannot initialize FirebaseApp without Android Context", e)
+                }
             }
         }
-        return FirebaseAuth.getInstance()
+    }
+
+    private fun getAuth(): FirebaseAuth {
+        val app = getOrInitFirebaseApp(context)
+        return FirebaseAuth.getInstance(app)
     }
 
     val currentUser: FirebaseUser?
