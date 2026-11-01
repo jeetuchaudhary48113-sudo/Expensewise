@@ -1,5 +1,8 @@
 package com.example.data
 
+import android.content.Context
+import android.util.Log
+import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
@@ -13,25 +16,53 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
-class AuthRepository {
+class AuthRepository(private val context: Context? = null) {
 
-    private val auth: FirebaseAuth = FirebaseAuth.getInstance()
+    private fun getAuth(): FirebaseAuth? {
+        return try {
+            if (context != null && FirebaseApp.getApps(context).isEmpty()) {
+                FirebaseApp.initializeApp(context)
+            }
+            FirebaseAuth.getInstance()
+        } catch (e: Exception) {
+            Log.e("AuthRepository", "Failed to retrieve FirebaseAuth: ${e.message}", e)
+            null
+        }
+    }
 
     val currentUser: FirebaseUser?
-        get() = auth.currentUser
+        get() = getAuth()?.currentUser
 
     val isUserLoggedIn: Boolean
-        get() = auth.currentUser != null
+        get() = currentUser != null
 
     val authStateFlow: Flow<FirebaseUser?> = callbackFlow {
+        val auth = getAuth()
+        if (auth == null) {
+            trySend(null)
+            awaitClose { }
+            return@callbackFlow
+        }
+
+        trySend(auth.currentUser)
+
         val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
             trySend(firebaseAuth.currentUser)
         }
         auth.addAuthStateListener(listener)
-        awaitClose { auth.removeAuthStateListener(listener) }
+        awaitClose {
+            try {
+                auth.removeAuthStateListener(listener)
+            } catch (e: Exception) {
+                Log.e("AuthRepository", "Error removing auth state listener: ${e.message}")
+            }
+        }
     }
 
     suspend fun signInWithEmail(email: String, password: String): Result<FirebaseUser> {
+        val auth = getAuth()
+            ?: return Result.failure(Exception("Authentication service is unavailable. Please check internet connection."))
+
         return try {
             val authResult = auth.signInWithEmailAndPassword(email.trim(), password).await()
             val user = authResult.user
@@ -46,6 +77,9 @@ class AuthRepository {
     }
 
     suspend fun signUpWithEmail(name: String, email: String, password: String): Result<FirebaseUser> {
+        val auth = getAuth()
+            ?: return Result.failure(Exception("Authentication service is unavailable. Please check internet connection."))
+
         return try {
             val authResult = auth.createUserWithEmailAndPassword(email.trim(), password).await()
             val user = authResult.user
@@ -66,6 +100,9 @@ class AuthRepository {
     }
 
     suspend fun sendPasswordResetEmail(email: String): Result<Unit> {
+        val auth = getAuth()
+            ?: return Result.failure(Exception("Authentication service is unavailable. Please check internet connection."))
+
         return try {
             auth.sendPasswordResetEmail(email.trim()).await()
             Result.success(Unit)
@@ -75,17 +112,24 @@ class AuthRepository {
     }
 
     fun signOut() {
-        auth.signOut()
+        try {
+            getAuth()?.signOut()
+        } catch (e: Exception) {
+            Log.e("AuthRepository", "Error signing out: ${e.message}", e)
+        }
     }
 
     private fun getReadableErrorMessage(e: Exception): String {
-        return when (e) {
-            is FirebaseAuthInvalidUserException -> "No account found with this email. Please register."
-            is FirebaseAuthInvalidCredentialsException -> "Incorrect email or password."
-            is FirebaseAuthUserCollisionException -> "An account with this email already exists."
-            is FirebaseAuthWeakPasswordException -> "Password is too weak. Please use at least 6 characters."
-            is FirebaseNetworkException -> "Network error. Please check your internet connection."
-            else -> e.localizedMessage ?: "Authentication failed. Please try again."
+        val msg = e.localizedMessage ?: ""
+        return when {
+            e is FirebaseAuthInvalidUserException -> "No account found with this email. Please register."
+            e is FirebaseAuthInvalidCredentialsException -> "Incorrect email or password."
+            e is FirebaseAuthUserCollisionException -> "An account with this email already exists."
+            e is FirebaseAuthWeakPasswordException -> "Password is too weak. Please use at least 6 characters."
+            e is FirebaseNetworkException -> "Network error. Please check your internet connection."
+            msg.contains("CONFIGURATION_NOT_FOUND", ignoreCase = true) || msg.contains("OPERATION_NOT_ALLOWED", ignoreCase = true) ->
+                "Email/Password sign-in is disabled in your Firebase console. Please enable Email/Password provider under Authentication."
+            else -> msg.ifBlank { "Authentication failed. Please try again." }
         }
     }
 }

@@ -60,7 +60,7 @@ class ExpenseViewModel(application: Application) : AndroidViewModel(application)
     private val database = AppDatabase.getDatabase(application, viewModelScope)
     private val repository = ExpenseRepository(database)
     private val prefs = PreferencesManager(application)
-    private val authRepository = AuthRepository()
+    private val authRepository = AuthRepository(application)
 
     val currentUser: StateFlow<FirebaseUser?> = authRepository.authStateFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, authRepository.currentUser)
