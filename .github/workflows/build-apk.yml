@@ -46,24 +46,29 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
-      - name: Create temporary debug keystore
+      - name: Setup persistent debug keystore
         run: |
           if [ ! -f "./debug.keystore" ]; then
-            echo "debug.keystore missing. Creating temporary debug keystore..."
-            keytool -genkeypair \
-              -alias androiddebugkey \
-              -keypass android \
-              -keystore ./debug.keystore \
-              -storepass android \
-              -dname "CN=Android Debug,O=Android,C=US" \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000
+            if [ -f "./debug.keystore.base64" ]; then
+              echo "Restoring persistent debug.keystore from debug.keystore.base64..."
+              base64 -d ./debug.keystore.base64 > ./debug.keystore
+            else
+              echo "debug.keystore missing. Creating temporary debug keystore..."
+              keytool -genkeypair \
+                -alias androiddebugkey \
+                -keypass android \
+                -keystore ./debug.keystore \
+                -storepass android \
+                -dname "CN=Android Debug,O=Android,C=US" \
+                -keyalg RSA \
+                -keysize 2048 \
+                -validity 10000
+            fi
           else
             echo "debug.keystore already exists."
           fi
           if [ ! -f "./debug.keystore" ]; then
-            echo "ERROR: Failed to create ./debug.keystore"
+            echo "ERROR: Failed to prepare ./debug.keystore"
             exit 1
           fi
           echo "Keystore verified at ./debug.keystore"
