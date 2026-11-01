@@ -58,8 +58,11 @@ import com.example.ui.components.ExpenseFormDialog
 import com.example.ui.screens.AllExpensesScreen
 import com.example.ui.screens.BudgetScreen
 import com.example.ui.screens.DashboardScreen
+import com.example.ui.screens.LoginScreen
+import com.example.ui.screens.RegisterScreen
 import com.example.ui.screens.ReportsScreen
 import com.example.ui.screens.SettingsScreen
+import com.example.ui.screens.WelcomeScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.util.CurrencyFormatter
 import kotlinx.coroutines.flow.collectLatest
@@ -86,8 +89,51 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val themeMode by viewModel.themeMode.collectAsState()
+            val isUserLoggedIn by viewModel.isUserLoggedIn.collectAsState()
+            var authScreen by remember { mutableStateOf("welcome") }
+
             MyApplicationTheme(themePreference = themeMode) {
-                ExpenseWiseApp(viewModel = viewModel)
+                if (isUserLoggedIn) {
+                    ExpenseWiseApp(viewModel = viewModel)
+                } else {
+                    when (authScreen) {
+                        "welcome" -> {
+                            WelcomeScreen(
+                                onNavigateToLogin = { authScreen = "login" },
+                                onNavigateToRegister = { authScreen = "register" }
+                            )
+                        }
+                        "register" -> {
+                            RegisterScreen(
+                                onRegister = { name, email, password, onResult ->
+                                    viewModel.register(name, email, password, onResult)
+                                },
+                                onNavigateToLogin = {
+                                    authScreen = "login"
+                                },
+                                onNavigateBack = {
+                                    authScreen = "welcome"
+                                }
+                            )
+                        }
+                        else -> {
+                            LoginScreen(
+                                onLogin = { email, password, onResult ->
+                                    viewModel.login(email, password, onResult)
+                                },
+                                onForgotPassword = { email, onResult ->
+                                    viewModel.sendPasswordReset(email, onResult)
+                                },
+                                onNavigateToRegister = {
+                                    authScreen = "register"
+                                },
+                                onNavigateBack = {
+                                    authScreen = "welcome"
+                                }
+                            )
+                        }
+                    }
+                }
             }
         }
     }

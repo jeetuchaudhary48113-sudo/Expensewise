@@ -17,10 +17,12 @@ import com.example.model.Expense
 import com.example.ui.components.BarChartItem
 import com.example.ui.components.CategorySpendItem
 import com.example.ui.components.TrendPoint
+import com.example.data.AuthRepository
 import com.example.util.CategoryIcons
 import com.example.util.DateFilterType
 import com.example.util.DateRange
 import com.example.util.DateUtils
+import com.google.firebase.auth.FirebaseUser
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -29,6 +31,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -57,6 +60,14 @@ class ExpenseViewModel(application: Application) : AndroidViewModel(application)
     private val database = AppDatabase.getDatabase(application, viewModelScope)
     private val repository = ExpenseRepository(database)
     private val prefs = PreferencesManager(application)
+    private val authRepository = AuthRepository()
+
+    val currentUser: StateFlow<FirebaseUser?> = authRepository.authStateFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, authRepository.currentUser)
+
+    val isUserLoggedIn: StateFlow<Boolean> = authRepository.authStateFlow
+        .map { it != null }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, authRepository.isUserLoggedIn)
 
     val allExpenses: StateFlow<List<Expense>> = repository.allExpenses
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -105,6 +116,20 @@ class ExpenseViewModel(application: Application) : AndroidViewModel(application)
             viewModelScope.launch {
                 repository.seedSampleData()
                 prefs.hasSeededInitial = true
+            }
+        }
+
+        // Sync user greeting name with Firebase user display name or email
+        viewModelScope.launch {
+            currentUser.collect { user ->
+                if (user != null) {
+                    val displayName = user.displayName
+                    if (!displayName.isNullOrBlank()) {
+                        _userName.value = displayName
+                    } else if (!user.email.isNullOrBlank()) {
+                        _userName.value = user.email!!.substringBefore("@").replaceFirstChar { it.uppercase() }
+                    }
+                }
             }
         }
     }
@@ -493,6 +518,64 @@ class ExpenseViewModel(application: Application) : AndroidViewModel(application)
             } catch (e: Exception) {
                 Toast.makeText(context, "Failed to share APK: ${e.message}", Toast.LENGTH_LONG).show()
             }
+        }
+    }
+
+    // Firebase Authentication
+    fun login(email: String, password: String, onResult: (Boolean, String?) -> Unit) {
+        viewModelScope.launch {
+            val result = authRepository.signInWithEmail(email, password)
+            if (result.isSuccess) {
+                val user = result.getOrNull()
+                user?.displayName?.takeIf { it.isNotBlank() }?.let { name ->
+                    updateSettings(name, currencySymbol.value, themeMode.value)
+                }
+                _snackBarMessage.emit("Welcome back, ${user?.displayName ?: "User"}!")
+                onResult(true, null)
+            } else {
+                val error = result.exceptionOrNull()?.message ?: "Login failed"
+                _snackBarMessage.emit(error)
+                onResult(false, error)
+            }
+        }
+    }
+
+    fun register(name: String, email: String, password: String, onResult: (Boolean, String?) -> Unit) {
+        viewModelScope.launch {
+            val result = authRepository.signUpWithEmail(name, email, password)
+            if (result.isSuccess) {
+                val user = result.getOrNull()
+                if (name.isNotBlank()) {
+                    updateSettings(name.trim(), currencySymbol.value, themeMode.value)
+                }
+                _snackBarMessage.emit("Account created successfully!")
+                onResult(true, null)
+            } else {
+                val error = result.exceptionOrNull()?.message ?: "Registration failed"
+                _snackBarMessage.emit(error)
+                onResult(false, error)
+            }
+        }
+    }
+
+    fun sendPasswordReset(email: String, onResult: (Boolean, String?) -> Unit) {
+        viewModelScope.launch {
+            val result = authRepository.sendPasswordResetEmail(email)
+            if (result.isSuccess) {
+                _snackBarMessage.emit("Password reset link sent to $email")
+                onResult(true, null)
+            } else {
+                val error = result.exceptionOrNull()?.message ?: "Failed to send reset email"
+                _snackBarMessage.emit(error)
+                onResult(false, error)
+            }
+        }
+    }
+
+    fun signOut() {
+        viewModelScope.launch {
+            authRepository.signOut()
+            _snackBarMessage.emit("Signed out successfully")
         }
     }
 }

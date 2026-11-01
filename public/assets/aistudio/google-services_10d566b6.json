@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "228650630825",
+    "project_id": "expensewise-de113",
+    "storage_bucket": "expensewise-de113.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:228650630825:android:13602ae0858abc1284b3b8",
+        "android_client_info": {
+          "package_name": "com.aistudio.expensewise.xqtrv"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD5CZDqwRaz1n-bUFlksWqEqvhX7GFxRXM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

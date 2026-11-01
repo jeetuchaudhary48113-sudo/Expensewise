@@ -79,12 +79,14 @@ fun SettingsScreen(
     val themeMode by viewModel.themeMode.collectAsState()
     val allCategories by viewModel.allCategories.collectAsState()
     val allExpenses by viewModel.allExpenses.collectAsState()
+    val currentUser by viewModel.currentUser.collectAsState()
 
     var showEditProfileDialog by remember { mutableStateOf(false) }
     var showAddCategoryDialog by remember { mutableStateOf(false) }
     var editingCategory by remember { mutableStateOf<Category?>(null) }
     var showRestoreDialog by remember { mutableStateOf(false) }
     var showResetConfirmDialog by remember { mutableStateOf(false) }
+    var showSignOutConfirmDialog by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = modifier
@@ -100,10 +102,75 @@ fun SettingsScreen(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Personalize currency, theme, categories, and backups",
+                text = "Personalize currency, theme, categories, and account",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+
+        // Account & Firebase Auth Profile Card
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("account_profile_card"),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Account & Profile",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(46.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = "Profile",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(26.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = currentUser?.displayName?.takeIf { it.isNotBlank() } ?: userName,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = currentUser?.email ?: "No email registered",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = { showSignOutConfirmDialog = true },
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.testTag("sign_out_button")
+                        ) {
+                            Text("Log Out")
+                        }
+                    }
+                }
+            }
         }
 
         // Profile & Currency Preferences Card
@@ -647,6 +714,28 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showResetConfirmDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    // Sign Out Confirmation Dialog
+    if (showSignOutConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showSignOutConfirmDialog = false },
+            title = { Text("Log Out?") },
+            text = { Text("Are you sure you want to log out of your ExpenseWise account?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.signOut()
+                        showSignOutConfirmDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    modifier = Modifier.testTag("confirm_sign_out_button")
+                ) { Text("Log Out") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSignOutConfirmDialog = false }) { Text("Cancel") }
             }
         )
     }
