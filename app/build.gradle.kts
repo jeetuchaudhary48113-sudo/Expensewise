@@ -16,8 +16,8 @@ android {
     applicationId = "com.aistudio.expensewise.xqtrv"
     minSdk = 24
     targetSdk = 36
-    versionCode = 5
-    versionName = "1.0.4"
+    versionCode = 6
+    versionName = "1.0.5"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -112,8 +112,8 @@ dependencies {
   // implementation(libs.firebase.firestore)
 
   implementation(libs.firebase.auth)
-  implementation(libs.firebase.appcheck.recaptcha)
-  implementation(libs.firebase.appcheck.debug)
+  // implementation(libs.firebase.appcheck.recaptcha)
+  // implementation(libs.firebase.appcheck.debug)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
   implementation(libs.logging.interceptor)

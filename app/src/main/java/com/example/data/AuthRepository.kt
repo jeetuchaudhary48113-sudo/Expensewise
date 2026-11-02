@@ -153,13 +153,15 @@ class AuthRepository(private val context: Context? = null) {
     }
 
     private fun getReadableErrorMessage(e: Exception): String {
-        val msg = e.localizedMessage ?: e.message ?: ""
-        return when {
+        val rawMsg = e.localizedMessage ?: e.message ?: ""
+        val firebaseAuthException = e as? com.google.firebase.auth.FirebaseAuthException
+        val rawErrorCode = firebaseAuthException?.errorCode ?: (e as? com.google.firebase.FirebaseException)?.javaClass?.simpleName ?: e.javaClass.simpleName
+
+        val humanReadable = when {
             e is FirebaseAuthInvalidUserException ->
                 "No account found with this email. Please check your email or create a new account."
             e is FirebaseAuthInvalidCredentialsException -> {
-                val errorCode = (e as? com.google.firebase.auth.FirebaseAuthException)?.errorCode
-                when (errorCode) {
+                when (rawErrorCode) {
                     "ERROR_INVALID_EMAIL" -> "The email address is improperly formatted."
                     "ERROR_WRONG_PASSWORD" -> "Incorrect password. Please try again or tap 'Forgot Password?'"
                     else -> "Invalid email or password. Please verify and try again."
@@ -173,15 +175,20 @@ class AuthRepository(private val context: Context? = null) {
                 "Too many attempts. Access is temporarily disabled for security. Please wait a moment."
             e is FirebaseNetworkException ->
                 "Network connection error. Please verify your internet or Wi-Fi connection."
-            msg.contains("CONFIGURATION_NOT_FOUND", ignoreCase = true) || msg.contains("OPERATION_NOT_ALLOWED", ignoreCase = true) ->
+            rawMsg.contains("CONFIGURATION_NOT_FOUND", ignoreCase = true) || rawMsg.contains("OPERATION_NOT_ALLOWED", ignoreCase = true) ->
                 "Email/Password sign-in provider is disabled in Firebase console (expensewise-de113)."
-            msg.contains("API_KEY_SERVICE_BLOCKED", ignoreCase = true) ->
+            rawMsg.contains("API_KEY_SERVICE_BLOCKED", ignoreCase = true) ->
                 "Firebase API key is blocked. Check Google Cloud Console API restrictions."
-            msg.contains("INVALID_LOGIN_CREDENTIALS", ignoreCase = true) ->
+            rawMsg.contains("INVALID_LOGIN_CREDENTIALS", ignoreCase = true) ->
                 "Incorrect email or password. Please check your credentials."
-            e is com.google.firebase.auth.FirebaseAuthException ->
-                "Authentication error (${e.errorCode}): ${e.localizedMessage ?: e.message ?: "Authentication failed."}"
-            else -> msg.ifBlank { "Authentication failed (${e.javaClass.simpleName}). Please try again." }
+            else -> rawMsg.ifBlank { "Authentication failed (${e.javaClass.simpleName})." }
+        }
+
+        // Always preserve exact Firebase error code and raw message for transparent diagnosis
+        return if (rawErrorCode.isNotBlank() && !humanReadable.contains(rawErrorCode)) {
+            "$humanReadable (Code: $rawErrorCode)"
+        } else {
+            humanReadable
         }
     }
 }
